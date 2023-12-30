@@ -34,7 +34,7 @@
    - Ajout trace pour visualiser sur le TFT : les min/max H et L, et les moyennes (moyDot, moyDash, moySP, discri, bMoy et barGraph)
 
  28/12/2023 : Modifications V1.3c ==> V1.3d :
-   - Retour à l'Algo de YT utilisant hightimesavg comme discriminateur . / -
+   - Retour à l'Algo de G6EJD utilisant hightimesavg comme discriminateur . / -
    - Utilisation de VSCode + PlatformIO (à la place de l'IDE Arduino) : Le programme MorseDecoderV1.3d.ino devient src/main.cpp
    - Republication sur GitHub (sans le code de F5BU, et au format PlatformIO)
 
@@ -63,7 +63,8 @@
  that license is http://www.gnu.org/copyleft/gpl.html
  Read more here http://en.wikipedia.org/wiki/Goertzel_algorithm 
  Adapted for the ESP32/ESP8266 by G6EJD  
-*/
+*********************************************************************************************************/
+#include "esp32/clk.h"
 
 // F4LAA : Using TFT4 SPI display
 #include "SPI.h"
@@ -94,6 +95,12 @@ void setVolume(uint8_t value)
   potVal = value;
 } 
 
+// Stockage des temps : High & Silent pour chaque caractère décodé
+#define MAXTIMES 11
+int iTimes;
+int dTimes[MAXTIMES];
+
+// Variables G6EJD using Goertzel algorithm
 float magnitude           = 0;;
 int   magnitudelimit      = 100;
 int   magnitudelimit_low  = 100;
@@ -179,15 +186,15 @@ void AddCharacter(char newchar)
       iRow = 0;
   }
   else
+  {
     // Shift chars to get place for the new char
-    for (int i = 0; i < nbChars; i++) DisplayLine[i] = DisplayLine[i+1];
+    for (int i = 0; i < nbChars; i++) 
+      DisplayLine[i] = DisplayLine[i+1];
+  }
   DisplayLine[nbChars - 1] = newchar;
 }
 
-// Stockage des temps : High & Silent pour chaque caractère décodé
-#define MAXTIMES 11
-int iTimes;
-int dTimes[MAXTIMES];
+// Gestion des temps
 void clearTimes()
 {
   for (int i=0; i<MAXTIMES; i++)
@@ -204,13 +211,15 @@ void addTime(int t)
 }
 void printTimes(char c)
 {
-  Serial.print(c + ":");
-  // for (int i=0; i<MAXTIMES; i++)
-  // {
-  //   if (i > 0)
-  //     Serial.print(";");
-  //   Serial.print(dTimes[i]);
-  // }
+  Serial.print(String(c));
+  for (int i=0; i<MAXTIMES; i++)
+  {
+    Serial.print(";");
+    if (i == iTimes)
+      Serial.print("0"); // Le dernier des temps enregistrés est le séparateur des char/words ==> On ne le met pas dans le DataSet
+    else
+      Serial.print(dTimes[i]);
+  }
   Serial.println();
   clearTimes();
 }
@@ -219,80 +228,80 @@ bool trace = false;
 char lastChar = '{';
 char curChar = '{';
 void CodeToChar() { // translate cw code to ascii character//
-  char decode_char = '{';
-  if (strcmp(CodeBuffer,".-") == 0)      decode_char = char('a');
-  if (strcmp(CodeBuffer,"-...") == 0)    decode_char = char('b');
-  if (strcmp(CodeBuffer,"-.-.") == 0)    decode_char = char('c');
-  if (strcmp(CodeBuffer,"-..") == 0)     decode_char = char('d'); 
-  if (strcmp(CodeBuffer,".") == 0)       decode_char = char('e'); 
-  if (strcmp(CodeBuffer,"..-.") == 0)    decode_char = char('f'); 
-  if (strcmp(CodeBuffer,"--.") == 0)     decode_char = char('g'); 
-  if (strcmp(CodeBuffer,"....") == 0)    decode_char = char('h'); 
-  if (strcmp(CodeBuffer,"..") == 0)      decode_char = char('i');
-  if (strcmp(CodeBuffer,".---") == 0)    decode_char = char('j');
-  if (strcmp(CodeBuffer,"-.-") == 0)     decode_char = char('k'); 
-  if (strcmp(CodeBuffer,".-..") == 0)    decode_char = char('l'); 
-  if (strcmp(CodeBuffer,"--") == 0)      decode_char = char('m'); 
-  if (strcmp(CodeBuffer,"-.") == 0)      decode_char = char('n'); 
-  if (strcmp(CodeBuffer,"---") == 0)     decode_char = char('o'); 
-  if (strcmp(CodeBuffer,".--.") == 0)    decode_char = char('p'); 
-  if (strcmp(CodeBuffer,"--.-") == 0)    decode_char = char('q'); 
-  if (strcmp(CodeBuffer,".-.") == 0)     decode_char = char('r'); 
-  if (strcmp(CodeBuffer,"...") == 0)     decode_char = char('s'); 
-  if (strcmp(CodeBuffer,"-") == 0)       decode_char = char('t'); 
-  if (strcmp(CodeBuffer,"..-") == 0)     decode_char = char('u'); 
-  if (strcmp(CodeBuffer,"...-") == 0)    decode_char = char('v'); 
-  if (strcmp(CodeBuffer,".--") == 0)     decode_char = char('w'); 
-  if (strcmp(CodeBuffer,"-..-") == 0)    decode_char = char('x'); 
-  if (strcmp(CodeBuffer,"-.--") == 0)    decode_char = char('y'); 
-  if (strcmp(CodeBuffer,"--..") == 0)    decode_char = char('z'); 
+  char decodedChar = '{';
+  if (strcmp(CodeBuffer,".-") == 0)      decodedChar = char('a');
+  if (strcmp(CodeBuffer,"-...") == 0)    decodedChar = char('b');
+  if (strcmp(CodeBuffer,"-.-.") == 0)    decodedChar = char('c');
+  if (strcmp(CodeBuffer,"-..") == 0)     decodedChar = char('d'); 
+  if (strcmp(CodeBuffer,".") == 0)       decodedChar = char('e'); 
+  if (strcmp(CodeBuffer,"..-.") == 0)    decodedChar = char('f'); 
+  if (strcmp(CodeBuffer,"--.") == 0)     decodedChar = char('g'); 
+  if (strcmp(CodeBuffer,"....") == 0)    decodedChar = char('h'); 
+  if (strcmp(CodeBuffer,"..") == 0)      decodedChar = char('i');
+  if (strcmp(CodeBuffer,".---") == 0)    decodedChar = char('j');
+  if (strcmp(CodeBuffer,"-.-") == 0)     decodedChar = char('k'); 
+  if (strcmp(CodeBuffer,".-..") == 0)    decodedChar = char('l'); 
+  if (strcmp(CodeBuffer,"--") == 0)      decodedChar = char('m'); 
+  if (strcmp(CodeBuffer,"-.") == 0)      decodedChar = char('n'); 
+  if (strcmp(CodeBuffer,"---") == 0)     decodedChar = char('o'); 
+  if (strcmp(CodeBuffer,".--.") == 0)    decodedChar = char('p'); 
+  if (strcmp(CodeBuffer,"--.-") == 0)    decodedChar = char('q'); 
+  if (strcmp(CodeBuffer,".-.") == 0)     decodedChar = char('r'); 
+  if (strcmp(CodeBuffer,"...") == 0)     decodedChar = char('s'); 
+  if (strcmp(CodeBuffer,"-") == 0)       decodedChar = char('t'); 
+  if (strcmp(CodeBuffer,"..-") == 0)     decodedChar = char('u'); 
+  if (strcmp(CodeBuffer,"...-") == 0)    decodedChar = char('v'); 
+  if (strcmp(CodeBuffer,".--") == 0)     decodedChar = char('w'); 
+  if (strcmp(CodeBuffer,"-..-") == 0)    decodedChar = char('x'); 
+  if (strcmp(CodeBuffer,"-.--") == 0)    decodedChar = char('y'); 
+  if (strcmp(CodeBuffer,"--..") == 0)    decodedChar = char('z'); 
   
-  if (strcmp(CodeBuffer,".----") == 0)   decode_char = char('1'); 
-  if (strcmp(CodeBuffer,"..---") == 0)   decode_char = char('2'); 
-  if (strcmp(CodeBuffer,"...--") == 0)   decode_char = char('3'); 
-  if (strcmp(CodeBuffer,"....-") == 0)   decode_char = char('4'); 
-  if (strcmp(CodeBuffer,".....") == 0)   decode_char = char('5'); 
-  if (strcmp(CodeBuffer,"-....") == 0)   decode_char = char('6'); 
-  if (strcmp(CodeBuffer,"--...") == 0)   decode_char = char('7'); 
-  if (strcmp(CodeBuffer,"---..") == 0)   decode_char = char('8'); 
-  if (strcmp(CodeBuffer,"----.") == 0)   decode_char = char('9'); 
-  if (strcmp(CodeBuffer,"-----") == 0)   decode_char = char('0'); 
+  if (strcmp(CodeBuffer,".----") == 0)   decodedChar = char('1'); 
+  if (strcmp(CodeBuffer,"..---") == 0)   decodedChar = char('2'); 
+  if (strcmp(CodeBuffer,"...--") == 0)   decodedChar = char('3'); 
+  if (strcmp(CodeBuffer,"....-") == 0)   decodedChar = char('4'); 
+  if (strcmp(CodeBuffer,".....") == 0)   decodedChar = char('5'); 
+  if (strcmp(CodeBuffer,"-....") == 0)   decodedChar = char('6'); 
+  if (strcmp(CodeBuffer,"--...") == 0)   decodedChar = char('7'); 
+  if (strcmp(CodeBuffer,"---..") == 0)   decodedChar = char('8'); 
+  if (strcmp(CodeBuffer,"----.") == 0)   decodedChar = char('9'); 
+  if (strcmp(CodeBuffer,"-----") == 0)   decodedChar = char('0'); 
 
-  if (strcmp(CodeBuffer,"..--..") == 0)  decode_char = char('?'); 
-  if (strcmp(CodeBuffer,".-.-.-") == 0)  decode_char = char('.'); 
-  if (strcmp(CodeBuffer,"--..--") == 0)  decode_char = char(','); 
-  if (strcmp(CodeBuffer,"-.-.--") == 0)  decode_char = char('!'); 
-  if (strcmp(CodeBuffer,".--.-.") == 0)  decode_char = char('@'); 
-  if (strcmp(CodeBuffer,"---...") == 0)  decode_char = char(':'); 
-  if (strcmp(CodeBuffer,"-....-") == 0)  decode_char = char('-'); 
-  if (strcmp(CodeBuffer,"-..-.") == 0)   decode_char = char('/'); 
+  if (strcmp(CodeBuffer,"..--..") == 0)  decodedChar = char('?'); 
+  if (strcmp(CodeBuffer,".-.-.-") == 0)  decodedChar = char('.'); 
+  if (strcmp(CodeBuffer,"--..--") == 0)  decodedChar = char(','); 
+  if (strcmp(CodeBuffer,"-.-.--") == 0)  decodedChar = char('!'); 
+  if (strcmp(CodeBuffer,".--.-.") == 0)  decodedChar = char('@'); 
+  if (strcmp(CodeBuffer,"---...") == 0)  decodedChar = char(':'); 
+  if (strcmp(CodeBuffer,"-....-") == 0)  decodedChar = char('-'); 
+  if (strcmp(CodeBuffer,"-..-.") == 0)   decodedChar = char('/'); 
 
-  if (strcmp(CodeBuffer,"-.--.") == 0)   decode_char = char('('); 
-  if (strcmp(CodeBuffer,"-.--.-") == 0)  decode_char = char(')'); 
-  if (strcmp(CodeBuffer,".-...") == 0)   decode_char = char('_'); 
-  if (strcmp(CodeBuffer,"...-..-") == 0) decode_char = char('$'); 
-  if (strcmp(CodeBuffer,"...-.-") == 0)  decode_char = char('>'); 
-  if (strcmp(CodeBuffer,".-.-.") == 0)   decode_char = char('<'); 
-  if (strcmp(CodeBuffer,"...-.") == 0)   decode_char = char('~'); 
-  if (strcmp(CodeBuffer,".-.-") == 0)    decode_char = char('a'); // a umlaut
-  if (strcmp(CodeBuffer,"---.") == 0)    decode_char = char('o'); // o accent
-  if (strcmp(CodeBuffer,".--.-") == 0)   decode_char = char('a'); // a accent
+  if (strcmp(CodeBuffer,"-.--.") == 0)   decodedChar = char('('); 
+  if (strcmp(CodeBuffer,"-.--.-") == 0)  decodedChar = char(')'); 
+  if (strcmp(CodeBuffer,".-...") == 0)   decodedChar = char('_'); 
+  if (strcmp(CodeBuffer,"...-..-") == 0) decodedChar = char('$'); 
+  if (strcmp(CodeBuffer,"...-.-") == 0)  decodedChar = char('>'); 
+  if (strcmp(CodeBuffer,".-.-.") == 0)   decodedChar = char('<'); 
+  if (strcmp(CodeBuffer,"...-.") == 0)   decodedChar = char('~'); 
+  if (strcmp(CodeBuffer,".-.-") == 0)    decodedChar = char('a'); // a umlaut
+  if (strcmp(CodeBuffer,"---.") == 0)    decodedChar = char('o'); // o accent
+  if (strcmp(CodeBuffer,".--.-") == 0)   decodedChar = char('a'); // a accent
 
   clearCodeBuffer();
 
-  if (decode_char != '{') {
-    AddCharacter(decode_char);
+  if (decodedChar != '{') {
+    AddCharacter(decodedChar);
     if (!graph && !dataSet)
     {
       lastChar = curChar;
-      curChar = decode_char;
+      curChar = decodedChar;
       cptCharPrinted++;
       if (cptCharPrinted > 100)
         CRRequested = true;
-      Serial.print(decode_char);
+      Serial.print(decodedChar);
     }
     if (dataSet)
-      printTimes(decode_char);
+      printTimes(decodedChar);
   }
 }
 
@@ -557,7 +566,8 @@ void setup() {
   tft.fillScreen(TFT_BLACK);
   tft.setTextSize(1);
   tft.setTextColor(TFT_ORANGE);
-  tftDrawString(125, 5, "CW Decoder V2.0 (30/12/2023) by F4LAA");
+  uint32_t cpu_freq = esp_clk_cpu_freq();
+  tftDrawString(0, 5, "CW Decoder V2.0 (30/12/2023) by F4LAA                            CpuFreq: " + String(cpu_freq / 1000000) + "MHz");
   tft.setTextSize(2);
 
   // Rotary encoder
