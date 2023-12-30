@@ -187,20 +187,32 @@ void AddCharacter(char newchar)
 // Stockage des temps : High & Silent pour chaque caractère décodé
 #define MAXTIMES 11
 int iTimes;
-int times[MAXTIMES];
+int dTimes[MAXTIMES];
 void clearTimes()
 {
   for (int i=0; i<MAXTIMES; i++)
-    times[i] = 0;
+    dTimes[i] = 0;
   iTimes = -1;
 }
-void addTime(int time)
+void addTime(int t)
 {
   if (iTimes < MAXTIMES)
   {
     iTimes++;
-    times[iTimes] = time;
+    dTimes[iTimes] = t;
   }
+}
+void printTimes(char c)
+{
+  Serial.print(c + ":");
+  // for (int i=0; i<MAXTIMES; i++)
+  // {
+  //   if (i > 0)
+  //     Serial.print(";");
+  //   Serial.print(dTimes[i]);
+  // }
+  Serial.println();
+  clearTimes();
 }
 
 bool trace = false;
@@ -280,13 +292,7 @@ void CodeToChar() { // translate cw code to ascii character//
       Serial.print(decode_char);
     }
     if (dataSet)
-    {
-      Serial.print(decode_char + ":");
-      for (int i=0; i<iTimes; i++)
-        Serial.print(times[iTimes]);
-      Serial.println();
-      iTimes = -1;
-    }
+      printTimes(decode_char);
   }
 }
 
