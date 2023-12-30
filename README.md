@@ -1,2 +1,2 @@
-# CWDecoder-1
+# CWDecoder-AI
 Morse decoder using AI
