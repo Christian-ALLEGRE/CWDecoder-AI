@@ -1,4 +1,4 @@
-# CWDecoder
+# CWDecoder-AI
 Morse decoder based on ESP32, Goertzel Algorithm and Neural Network
 
  F4LAA : ESP32 Real Time Morse Decoder
