@@ -42,6 +42,10 @@
    - Ajout génération DataSet pour alimenter un réseau de Neurones
    - Gestion vitesse ADC : div=1 au lieu de 2 mis par PlatformIO
 
+ 03/01/2024 : Modifications V2.0 ==> V2.0a :
+   - Connexion à CWDecoder-UI (programme Windows de réception décodage Morse et Play du son des lettre décodées)
+   - On ne force plus un CR tous les 100 caractères (comme quand c'est l'IDE Arduino qui écoute)
+
  =====================================================================================
  Morse Code Decoder using an OLED and basic microphone
 
@@ -159,10 +163,7 @@ void printTimes(char c)
   for (int i=0; i<MAXTIMES; i++)
   {
     Serial.print(";"); 
-    // if (i == iTimes)
-    //   Serial.print("0"); // Le dernier des temps enregistrés est le séparateur des char/words ==> On ne le met pas dans le DataSet
-    // else
-      Serial.print(dTimes[i]);
+    Serial.print(dTimes[i]);
   }
   Serial.println();
 }
@@ -200,8 +201,8 @@ void AddCharacter(char newchar)
   {
     CRRequested = false;
     cptCharPrinted = 0;
-    if (!graph && !dataSet)
-      Serial.println();
+    // if (!graph && !dataSet)
+    //   Serial.println(); // Inutile si avec CWDecoder-UI
   }
 
   iCar++;
@@ -588,7 +589,7 @@ void setup() {
   tft.setTextSize(1);
   tft.setTextColor(TFT_ORANGE);
   uint32_t cpu_freq = esp_clk_cpu_freq();
-  tftDrawString(0, 5, "CW Decoder V2.0 (30/12/2023) by F4LAA (PlatformIO)              CpuFreq: " + String(cpu_freq / 1000000) + "MHz");
+  tftDrawString(0, 5, "CW Decoder V2.0a (03/01/2024) by F4LAA (PlatformIO)             CpuFreq: " + String(cpu_freq / 1000000) + "MHz");
   // ATTENTION: Si on enlève cette trace, le adc_set_clk_div(1) ne fonctionne pas !!!
   // uint32_t abp_freq = esp_clk_apb_freq();  
   tft.setTextSize(2);
