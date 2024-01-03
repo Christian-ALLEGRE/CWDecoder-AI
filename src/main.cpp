@@ -40,6 +40,7 @@
 
  30/12/2023 : Modifications V1.3d ==> V2.0 :
    - Ajout génération DataSet pour alimenter un réseau de Neurones
+   - Gestion vitesse ADC : div=1 au lieu de 2 mis par PlatformIO
 
  =====================================================================================
  Morse Code Decoder using an OLED and basic microphone
@@ -65,6 +66,7 @@
  Adapted for the ESP32/ESP8266 by G6EJD  
 *********************************************************************************************************/
 #include "esp32/clk.h"
+#include "driver/adc.h"
 
 // F4LAA : Using TFT4 SPI display
 #include "SPI.h"
@@ -94,11 +96,6 @@ void setVolume(uint8_t value)
   tftDrawString(396, 280, String(pourcent, 0) + "%  ");
   potVal = value;
 } 
-
-// Stockage des temps : High & Silent pour chaque caractère décodé
-#define MAXTIMES 11
-int iTimes;
-int dTimes[MAXTIMES];
 
 // Variables G6EJD using Goertzel algorithm
 float magnitude           = 0;;
@@ -195,6 +192,11 @@ void AddCharacter(char newchar)
 }
 
 // Gestion des temps
+// Stockage des temps : High & Silent pour chaque caractère décodé
+#define MAXTIMES 11
+int iTimes;
+int dTimes[MAXTIMES];
+
 void clearTimes()
 {
   for (int i=0; i<MAXTIMES; i++)
@@ -215,9 +217,9 @@ void printTimes(char c)
   for (int i=0; i<MAXTIMES; i++)
   {
     Serial.print(";");
-    if (i == iTimes)
-      Serial.print("0"); // Le dernier des temps enregistrés est le séparateur des char/words ==> On ne le met pas dans le DataSet
-    else
+    // if (i == iTimes)
+    //   Serial.print("0"); // Le dernier des temps enregistrés est le séparateur des char/words ==> On ne le met pas dans le DataSet
+    // else
       Serial.print(dTimes[i]);
   }
   Serial.println();
@@ -328,6 +330,7 @@ int freqs[] = { 496, // for MorseSample-15WPM.wav file
                 1136  // for QSO PiouPiou CW on SSB (IC-7000)
               };
 bool autoTune = true;
+bool sAutoTune = true;
 int sensFreq = 1;
 float sampling_freq = 0;
 float target_freq = 0;
@@ -477,6 +480,13 @@ void manageRotaryButton()
           break;
         case 'I':
           dataSet = !dataSet;
+          if (dataSet)
+          {
+            sAutoTune = autoTune;
+            autoTune = false;
+          }
+          else
+            autoTune = sAutoTune;
           break;
       }        
     }
@@ -531,6 +541,13 @@ void manageRotaryButton()
           break;
         case 'I':
           dataSet = !dataSet;
+          if (dataSet)
+          {
+            sAutoTune = autoTune;
+            autoTune = false;
+          }
+          else
+            autoTune = sAutoTune;
           break;
       }
     }
@@ -557,6 +574,10 @@ void setup() {
   Serial.begin(115200);
   delay(1200); // 1200 mini to wait Serial is initialized...
 
+  // Gestion des ADC
+  esp_err_t errCode = adc_set_clk_div(1); // Using PlatformIO, default=2 !!!!!! We need 1 (i.e no dividor) ti get over 10k Samples/s
+  Serial.println("adc_set_clk_div(): ErrCode=" + String(errCode));
+
   // TFT 4" SPI Init
   // Max SPI_FREQUENCY for this tft is 80000000 (80MHz) which is also the Max SPI speed for ESP32
   // It is only 10 MHz for SPI Potientiometer according to MCP41010 Datasheet, 
@@ -567,7 +588,9 @@ void setup() {
   tft.setTextSize(1);
   tft.setTextColor(TFT_ORANGE);
   uint32_t cpu_freq = esp_clk_cpu_freq();
-  tftDrawString(0, 5, "CW Decoder V2.0 (30/12/2023) by F4LAA                            CpuFreq: " + String(cpu_freq / 1000000) + "MHz");
+  tftDrawString(0, 5, "CW Decoder V2.0 (30/12/2023) by F4LAA (PlatformIO)              CpuFreq: " + String(cpu_freq / 1000000) + "MHz");
+  // ATTENTION: Si on enlève cette trace, le adc_set_clk_div(1) ne fonctionne pas !!!
+  // uint32_t abp_freq = esp_clk_apb_freq();  
   tft.setTextSize(2);
 
   // Rotary encoder
@@ -577,6 +600,10 @@ void setup() {
   pinMode (rotEncSW,INPUT_PULLUP);
   //rotSWState = digitalRead(rotEncSW);
   /* */
+
+  // Gestion des ADC : Il faut le refaire (après Init du TFT) !!!
+  esp_err_t errCode2 = adc_set_clk_div(1); // Using PlatformIO, default=2 !!!!!! We need 1 (i.e no dividor) ti get over 10k Samples/s
+  Serial.println("adc_set_clk_div(): ErrCode2=" + String(errCode2));
 
   // Measure sampling_freq
   int tStartLoop = millis();
