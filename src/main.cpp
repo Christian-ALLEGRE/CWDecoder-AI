@@ -133,6 +133,40 @@ int rotSWState = 0;
 int rotSWLastState = 0;
 // EndOf Rotary variables definition
 
+// Gestion des temps
+// Stockage des temps : High & Silent pour chaque caractère décodé
+#define MAXTIMES 11
+int iTimes;
+int dTimes[MAXTIMES];
+
+void clearTimes()
+{
+  for (int i=0; i<MAXTIMES; i++)
+    dTimes[i] = 0;
+  iTimes = -1;
+}
+void addTime(int t)
+{
+  if (iTimes < MAXTIMES)
+  {
+    iTimes++;
+    dTimes[iTimes] = t;
+  }
+}
+void printTimes(char c)
+{
+  Serial.print(String(c));
+  for (int i=0; i<MAXTIMES; i++)
+  {
+    Serial.print(";"); 
+    // if (i == iTimes)
+    //   Serial.print("0"); // Le dernier des temps enregistrés est le séparateur des char/words ==> On ne le met pas dans le DataSet
+    // else
+      Serial.print(dTimes[i]);
+  }
+  Serial.println();
+}
+
 #define bufSize 8
 char CodeBuffer[bufSize]; // 6 . ou - + 1 en trop (avant sécurité) + \0
 #define nbChars 33
@@ -152,6 +186,7 @@ void clearCodeBuffer()
 {
   CodeBuffer[0] = '\0';
   for (int i = 1; i < bufSize; i++) CodeBuffer[i] = ' ';
+  clearTimes();
 };
 
 int cptCharPrinted = 0;
@@ -189,41 +224,6 @@ void AddCharacter(char newchar)
       DisplayLine[i] = DisplayLine[i+1];
   }
   DisplayLine[nbChars - 1] = newchar;
-}
-
-// Gestion des temps
-// Stockage des temps : High & Silent pour chaque caractère décodé
-#define MAXTIMES 11
-int iTimes;
-int dTimes[MAXTIMES];
-
-void clearTimes()
-{
-  for (int i=0; i<MAXTIMES; i++)
-    dTimes[i] = 0;
-  iTimes = -1;
-}
-void addTime(int t)
-{
-  if (iTimes < MAXTIMES)
-  {
-    iTimes++;
-    dTimes[iTimes] = t;
-  }
-}
-void printTimes(char c)
-{
-  Serial.print(String(c));
-  for (int i=0; i<MAXTIMES; i++)
-  {
-    Serial.print(";");
-    // if (i == iTimes)
-    //   Serial.print("0"); // Le dernier des temps enregistrés est le séparateur des char/words ==> On ne le met pas dans le DataSet
-    // else
-      Serial.print(dTimes[i]);
-  }
-  Serial.println();
-  clearTimes();
 }
 
 bool trace = false;
@@ -289,8 +289,6 @@ void CodeToChar() { // translate cw code to ascii character//
   if (strcmp(CodeBuffer,"---.") == 0)    decodedChar = char('o'); // o accent
   if (strcmp(CodeBuffer,".--.-") == 0)   decodedChar = char('a'); // a accent
 
-  clearCodeBuffer();
-
   if (decodedChar != '{') {
     AddCharacter(decodedChar);
     if (!graph && !dataSet)
@@ -305,6 +303,8 @@ void CodeToChar() { // translate cw code to ascii character//
     if (dataSet)
       printTimes(decodedChar);
   }
+
+  clearCodeBuffer();
 }
 
 float goertzelCoeff; // For Goertzel algorithm
@@ -636,7 +636,6 @@ void setup() {
 
   clearDisplayLine(); // CodeBuffer suit en mémoire. C'est lui qui contient le \0 final
   clearCodeBuffer();
-  clearTimes();
 
   // SPI Potentiometre (uses SPI instance defined in TFT library)
   pinMode (slaveSelectPin, OUTPUT); 
