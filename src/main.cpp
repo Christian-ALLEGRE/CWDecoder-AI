@@ -45,6 +45,7 @@
  03/01/2024 : Modifications V2.0 ==> V2.0a :
    - Connexion à CWDecoder-UI (programme Windows de réception décodage Morse et Play du son des lettre décodées)
    - On ne force plus un CR tous les 100 caractères (comme quand c'est l'IDE Arduino qui écoute)
+   - On ajuste automatiquement nbSamples en fonction du WPM (Mesuré OK: 110samples pour 15WPM, 70samples pour 33WPM )
 
  =====================================================================================
  Morse Code Decoder using an OLED and basic microphone
@@ -78,10 +79,13 @@
 
 TFT_eSPI tft = TFT_eSPI();  
 
-void tftDrawString(int x, int y, String s)
+void tftDrawString(int x, int y, String s, bool display = true)
 {
-  tft.setCursor(x, y);
-  tft.println(s);
+  if (display)
+  {
+    tft.setCursor(x, y);
+    tft.println(s);
+  }
 }
 
 // SPI Potentiometre
@@ -142,11 +146,23 @@ int rotSWLastState = 0;
 #define MAXTIMES 11
 int iTimes;
 int dTimes[MAXTIMES];
+int dTimes2[MAXTIMES];
 
-void clearTimes()
+void clearTimes(bool clone)
 {
-  for (int i=0; i<MAXTIMES; i++)
-    dTimes[i] = 0;
+  if(clone)
+    for (int i=0; i<MAXTIMES; i++)
+    {
+      dTimes2[i] = dTimes[i]; // Clone it
+      dTimes[i] = 0;
+    }
+  else
+    for (int i=0; i<MAXTIMES; i++)
+    {
+      dTimes[i] = 0;
+      dTimes2[i] = 0;
+    }
+
   iTimes = -1;
 }
 void addTime(int t)
@@ -163,13 +179,14 @@ void printTimes(char c)
   for (int i=0; i<MAXTIMES; i++)
   {
     Serial.print(";"); 
-    Serial.print(dTimes[i]);
+    Serial.print(dTimes2[i]); // Use cloned
   }
   Serial.println();
 }
 
 #define bufSize 8
 char CodeBuffer[bufSize]; // 6 . ou - + 1 en trop (avant sécurité) + \0
+char CodeBuffer2[bufSize]; // 6 . ou - + 1 en trop (avant sécurité) + \0
 #define nbChars 33
 char DisplayLine[nbChars];
 int iRow = 0;
@@ -183,11 +200,13 @@ void clearDisplayLine()
   for (int i = 0; i < nbChars; i++) DisplayLine[i] = ' ';
 }
 
-void clearCodeBuffer()
+void clearCodeBuffer(bool clone)
 {
+  clearTimes(clone);
+  if (clone)
+    strcpy(CodeBuffer2, CodeBuffer);
   CodeBuffer[0] = '\0';
-  for (int i = 1; i < bufSize; i++) CodeBuffer[i] = ' ';
-  clearTimes();
+  // for (int i = 1; i < bufSize; i++) CodeBuffer[i] = ' ';
 };
 
 int cptCharPrinted = 0;
@@ -231,64 +250,65 @@ bool trace = false;
 char lastChar = '{';
 char curChar = '{';
 void CodeToChar() { // translate cw code to ascii character//
+  clearCodeBuffer(true);
   char decodedChar = '{';
-  if (strcmp(CodeBuffer,".-") == 0)      decodedChar = char('a');
-  if (strcmp(CodeBuffer,"-...") == 0)    decodedChar = char('b');
-  if (strcmp(CodeBuffer,"-.-.") == 0)    decodedChar = char('c');
-  if (strcmp(CodeBuffer,"-..") == 0)     decodedChar = char('d'); 
-  if (strcmp(CodeBuffer,".") == 0)       decodedChar = char('e'); 
-  if (strcmp(CodeBuffer,"..-.") == 0)    decodedChar = char('f'); 
-  if (strcmp(CodeBuffer,"--.") == 0)     decodedChar = char('g'); 
-  if (strcmp(CodeBuffer,"....") == 0)    decodedChar = char('h'); 
-  if (strcmp(CodeBuffer,"..") == 0)      decodedChar = char('i');
-  if (strcmp(CodeBuffer,".---") == 0)    decodedChar = char('j');
-  if (strcmp(CodeBuffer,"-.-") == 0)     decodedChar = char('k'); 
-  if (strcmp(CodeBuffer,".-..") == 0)    decodedChar = char('l'); 
-  if (strcmp(CodeBuffer,"--") == 0)      decodedChar = char('m'); 
-  if (strcmp(CodeBuffer,"-.") == 0)      decodedChar = char('n'); 
-  if (strcmp(CodeBuffer,"---") == 0)     decodedChar = char('o'); 
-  if (strcmp(CodeBuffer,".--.") == 0)    decodedChar = char('p'); 
-  if (strcmp(CodeBuffer,"--.-") == 0)    decodedChar = char('q'); 
-  if (strcmp(CodeBuffer,".-.") == 0)     decodedChar = char('r'); 
-  if (strcmp(CodeBuffer,"...") == 0)     decodedChar = char('s'); 
-  if (strcmp(CodeBuffer,"-") == 0)       decodedChar = char('t'); 
-  if (strcmp(CodeBuffer,"..-") == 0)     decodedChar = char('u'); 
-  if (strcmp(CodeBuffer,"...-") == 0)    decodedChar = char('v'); 
-  if (strcmp(CodeBuffer,".--") == 0)     decodedChar = char('w'); 
-  if (strcmp(CodeBuffer,"-..-") == 0)    decodedChar = char('x'); 
-  if (strcmp(CodeBuffer,"-.--") == 0)    decodedChar = char('y'); 
-  if (strcmp(CodeBuffer,"--..") == 0)    decodedChar = char('z'); 
+  if (strcmp(CodeBuffer2,".-") == 0)      decodedChar = char('a');
+  if (strcmp(CodeBuffer2,"-...") == 0)    decodedChar = char('b');
+  if (strcmp(CodeBuffer2,"-.-.") == 0)    decodedChar = char('c');
+  if (strcmp(CodeBuffer2,"-..") == 0)     decodedChar = char('d'); 
+  if (strcmp(CodeBuffer2,".") == 0)       decodedChar = char('e'); 
+  if (strcmp(CodeBuffer2,"..-.") == 0)    decodedChar = char('f'); 
+  if (strcmp(CodeBuffer2,"--.") == 0)     decodedChar = char('g'); 
+  if (strcmp(CodeBuffer2,"....") == 0)    decodedChar = char('h'); 
+  if (strcmp(CodeBuffer2,"..") == 0)      decodedChar = char('i');
+  if (strcmp(CodeBuffer2,".---") == 0)    decodedChar = char('j');
+  if (strcmp(CodeBuffer2,"-.-") == 0)     decodedChar = char('k'); 
+  if (strcmp(CodeBuffer2,".-..") == 0)    decodedChar = char('l'); 
+  if (strcmp(CodeBuffer2,"--") == 0)      decodedChar = char('m'); 
+  if (strcmp(CodeBuffer2,"-.") == 0)      decodedChar = char('n'); 
+  if (strcmp(CodeBuffer2,"---") == 0)     decodedChar = char('o'); 
+  if (strcmp(CodeBuffer2,".--.") == 0)    decodedChar = char('p'); 
+  if (strcmp(CodeBuffer2,"--.-") == 0)    decodedChar = char('q'); 
+  if (strcmp(CodeBuffer2,".-.") == 0)     decodedChar = char('r'); 
+  if (strcmp(CodeBuffer2,"...") == 0)     decodedChar = char('s'); 
+  if (strcmp(CodeBuffer2,"-") == 0)       decodedChar = char('t'); 
+  if (strcmp(CodeBuffer2,"..-") == 0)     decodedChar = char('u'); 
+  if (strcmp(CodeBuffer2,"...-") == 0)    decodedChar = char('v'); 
+  if (strcmp(CodeBuffer2,".--") == 0)     decodedChar = char('w'); 
+  if (strcmp(CodeBuffer2,"-..-") == 0)    decodedChar = char('x'); 
+  if (strcmp(CodeBuffer2,"-.--") == 0)    decodedChar = char('y'); 
+  if (strcmp(CodeBuffer2,"--..") == 0)    decodedChar = char('z'); 
   
-  if (strcmp(CodeBuffer,".----") == 0)   decodedChar = char('1'); 
-  if (strcmp(CodeBuffer,"..---") == 0)   decodedChar = char('2'); 
-  if (strcmp(CodeBuffer,"...--") == 0)   decodedChar = char('3'); 
-  if (strcmp(CodeBuffer,"....-") == 0)   decodedChar = char('4'); 
-  if (strcmp(CodeBuffer,".....") == 0)   decodedChar = char('5'); 
-  if (strcmp(CodeBuffer,"-....") == 0)   decodedChar = char('6'); 
-  if (strcmp(CodeBuffer,"--...") == 0)   decodedChar = char('7'); 
-  if (strcmp(CodeBuffer,"---..") == 0)   decodedChar = char('8'); 
-  if (strcmp(CodeBuffer,"----.") == 0)   decodedChar = char('9'); 
-  if (strcmp(CodeBuffer,"-----") == 0)   decodedChar = char('0'); 
+  if (strcmp(CodeBuffer2,".----") == 0)   decodedChar = char('1'); 
+  if (strcmp(CodeBuffer2,"..---") == 0)   decodedChar = char('2'); 
+  if (strcmp(CodeBuffer2,"...--") == 0)   decodedChar = char('3'); 
+  if (strcmp(CodeBuffer2,"....-") == 0)   decodedChar = char('4'); 
+  if (strcmp(CodeBuffer2,".....") == 0)   decodedChar = char('5'); 
+  if (strcmp(CodeBuffer2,"-....") == 0)   decodedChar = char('6'); 
+  if (strcmp(CodeBuffer2,"--...") == 0)   decodedChar = char('7'); 
+  if (strcmp(CodeBuffer2,"---..") == 0)   decodedChar = char('8'); 
+  if (strcmp(CodeBuffer2,"----.") == 0)   decodedChar = char('9'); 
+  if (strcmp(CodeBuffer2,"-----") == 0)   decodedChar = char('0'); 
 
-  if (strcmp(CodeBuffer,"..--..") == 0)  decodedChar = char('?'); 
-  if (strcmp(CodeBuffer,".-.-.-") == 0)  decodedChar = char('.'); 
-  if (strcmp(CodeBuffer,"--..--") == 0)  decodedChar = char(','); 
-  if (strcmp(CodeBuffer,"-.-.--") == 0)  decodedChar = char('!'); 
-  if (strcmp(CodeBuffer,".--.-.") == 0)  decodedChar = char('@'); 
-  if (strcmp(CodeBuffer,"---...") == 0)  decodedChar = char(':'); 
-  if (strcmp(CodeBuffer,"-....-") == 0)  decodedChar = char('-'); 
-  if (strcmp(CodeBuffer,"-..-.") == 0)   decodedChar = char('/'); 
+  if (strcmp(CodeBuffer2,"..--..") == 0)  decodedChar = char('?'); 
+  if (strcmp(CodeBuffer2,".-.-.-") == 0)  decodedChar = char('.'); 
+  if (strcmp(CodeBuffer2,"--..--") == 0)  decodedChar = char(','); 
+  if (strcmp(CodeBuffer2,"-.-.--") == 0)  decodedChar = char('!'); 
+  if (strcmp(CodeBuffer2,".--.-.") == 0)  decodedChar = char('@'); 
+  if (strcmp(CodeBuffer2,"---...") == 0)  decodedChar = char(':'); 
+  if (strcmp(CodeBuffer2,"-....-") == 0)  decodedChar = char('-'); 
+  if (strcmp(CodeBuffer2,"-..-.") == 0)   decodedChar = char('/'); 
 
-  if (strcmp(CodeBuffer,"-.--.") == 0)   decodedChar = char('('); 
-  if (strcmp(CodeBuffer,"-.--.-") == 0)  decodedChar = char(')'); 
-  if (strcmp(CodeBuffer,".-...") == 0)   decodedChar = char('_'); 
-  if (strcmp(CodeBuffer,"...-..-") == 0) decodedChar = char('$'); 
-  if (strcmp(CodeBuffer,"...-.-") == 0)  decodedChar = char('>'); 
-  if (strcmp(CodeBuffer,".-.-.") == 0)   decodedChar = char('<'); 
-  if (strcmp(CodeBuffer,"...-.") == 0)   decodedChar = char('~'); 
-  if (strcmp(CodeBuffer,".-.-") == 0)    decodedChar = char('a'); // a umlaut
-  if (strcmp(CodeBuffer,"---.") == 0)    decodedChar = char('o'); // o accent
-  if (strcmp(CodeBuffer,".--.-") == 0)   decodedChar = char('a'); // a accent
+  if (strcmp(CodeBuffer2,"-.--.") == 0)   decodedChar = char('('); 
+  if (strcmp(CodeBuffer2,"-.--.-") == 0)  decodedChar = char(')'); 
+  if (strcmp(CodeBuffer2,".-...") == 0)   decodedChar = char('_'); 
+  if (strcmp(CodeBuffer2,"...-..-") == 0) decodedChar = char('$'); 
+  if (strcmp(CodeBuffer2,"...-.-") == 0)  decodedChar = char('>'); 
+  if (strcmp(CodeBuffer2,".-.-.") == 0)   decodedChar = char('<'); 
+  if (strcmp(CodeBuffer2,"...-.") == 0)   decodedChar = char('~'); 
+  if (strcmp(CodeBuffer2,".-.-") == 0)    decodedChar = char('a'); // a umlaut
+  if (strcmp(CodeBuffer2,"---.") == 0)    decodedChar = char('o'); // o accent
+  if (strcmp(CodeBuffer2,".--.-") == 0)   decodedChar = char('a'); // a accent
 
   if (decodedChar != '{') {
     AddCharacter(decodedChar);
@@ -304,21 +324,21 @@ void CodeToChar() { // translate cw code to ascii character//
     if (dataSet)
       printTimes(decodedChar);
   }
-
-  clearCodeBuffer();
 }
 
 float goertzelCoeff; // For Goertzel algorithm
 float Q1 = 0;
 float Q2 = 0;
 
-#define NBSAMPLEMIN 50
+#define NBSAMPLEMIN 30
 #define NBSAMPLEMAX 250
 int testData[NBSAMPLEMAX];
-int nbSamples = 110;
+int nbSamples = 100;
+int newNbSamples = 100;
+int sNewNbSamples = 100;
 
 // you can set the tuning tone to 496, 558, 744 or 992
-int iFreq = 0;  
+int iFreq;
 int iFreqMax = 8; // = NbFreq - 1
 int freqs[] = { 496, // for MorseSample-15WPM.wav file
                 558, 
@@ -330,8 +350,8 @@ int freqs[] = { 496, // for MorseSample-15WPM.wav file
                 1040, // for QSO PiouPiou CW on SSB (IC-7000)
                 1136  // for QSO PiouPiou CW on SSB (IC-7000)
               };
-bool autoTune = true;
-bool sAutoTune = true;
+bool autoTune = false;
+bool sAutoTune = false;
 int sensFreq = 1;
 float sampling_freq = 0;
 float target_freq = 0;
@@ -448,7 +468,7 @@ void manageRotaryButton()
           setVolume(potVal); 
           break;
         case 'S':
-          nbSamples += 10;
+          nbSamples += 5;
           if (nbSamples > NBSAMPLEMAX)
             nbSamples = NBSAMPLEMAX;
           setBandWidth(nbSamples);
@@ -509,7 +529,7 @@ void manageRotaryButton()
           setVolume(potVal); 
           break;
         case 'S':
-          nbSamples -= 10;
+          nbSamples -= 5;
           if (nbSamples < NBSAMPLEMIN)
             nbSamples = NBSAMPLEMIN;
           setBandWidth(nbSamples);
@@ -589,7 +609,7 @@ void setup() {
   tft.setTextSize(1);
   tft.setTextColor(TFT_ORANGE);
   uint32_t cpu_freq = esp_clk_cpu_freq();
-  tftDrawString(0, 5, "CW Decoder V2.0a (03/01/2024) by F4LAA (PlatformIO)             CpuFreq: " + String(cpu_freq / 1000000) + "MHz");
+  tftDrawString(0, 5, "CW Decoder V2.0a (03/01/2024) by F4LAA (PlatformIO)             CpuFreq: " + String(cpu_freq / 1000000) + "MHz", true);
   // ATTENTION: Si on enlève cette trace, le adc_set_clk_div(1) ne fonctionne pas !!!
   // uint32_t abp_freq = esp_clk_apb_freq();  
   tft.setTextSize(2);
@@ -615,13 +635,13 @@ void setup() {
   // Templates
   tft.setTextColor(TFT_SKYBLUE);
   tftDrawString(0, 20, "Freq=    Hz BW=   Hz WPM=   MAG=");
-  tftDrawString(0, 280, "Acq=   ms");  
-  tftDrawString(116, 280, "Loop=   ms");  
+  tftDrawString(0, 280, "Acq=   ms", true);  
+  tftDrawString(116, 280, "Loop=   ms", true);  
   tftDrawString(0, 300, "Cde:");
   tftDrawString(312, 280, "Volume:");
-  tftDrawString(312, 300, "SmplFreq=");
+  tftDrawString(312, 300, "SmplFreq=", true);
   tft.setTextColor(TFT_WHITE, TFT_BLACK); // BGColor need to be set to TFT_BLACK to prevent overwriting !!!
-  tftDrawString(420, 300, String(sampling_freq, 0));
+  tftDrawString(420, 300, String(sampling_freq, 0), true);
   //EndOfTemplates
   
   setBandWidth(nbSamples);
@@ -629,14 +649,14 @@ void setup() {
   //////////////////////////////////// The basic goertzel calculation //////////////////////////////////////
   // you can set the tuning tone to 496, 558, 744 or 992
   // The number of samples determines bandwidth
-  iFreq = 0;
+  iFreq = 3; // = 640Hz i.e. la frequence CW de l'IC-7300 
   setFreq(iFreq); 
 
   idxCde = 0;
   showCde(idxCde);
 
   clearDisplayLine(); // CodeBuffer suit en mémoire. C'est lui qui contient le \0 final
-  clearCodeBuffer();
+  clearCodeBuffer(true);
 
   // SPI Potentiometre (uses SPI instance defined in TFT library)
   pinMode (slaveSelectPin, OUTPUT); 
@@ -731,7 +751,7 @@ Acq:
   if (cptLoop == 1)
   {
     int acqTime = millis() - tStartLoop;
-    tftDrawString(48, 280, String(acqTime) + " ");  
+    tftDrawString(48, 280, String(acqTime) + " ", true);  
   }
 
   // Compute magniture using Goertzel algorithm
@@ -811,7 +831,26 @@ Acq:
           strcat(CodeBuffer, "-");
           addTime(highduration); // Dash duration
           //Serial.print("-");
-          wpm = (wpm + (1200 / ((highduration) / 3))) / 2; //// the most precise we can do ;o)
+
+          if ( (highduration > 66) // Ignore too short highduration caused by silent
+               && 
+               (highduration < 500) // Ignore too long highduration caused by silent
+             )
+          {
+            // Compute WPM
+            wpm = (wpm + (1200 / ((highduration) / 3))) / 2; //// the most precise we can do ;o)
+
+            // Now, adjust NBSAMPLES according to WPM
+            newNbSamples = map(wpm, 15, 33, 110, 70);  // Mesuré OK: 110samples pour 15WPM, 70samples pour 33WPM       
+            if (abs(newNbSamples - sNewNbSamples) > 2) 
+            {
+              nbSamples = newNbSamples;
+              setBandWidth(nbSamples);
+              // Serial.println();
+              // Serial.println("highduration=" + String(highduration) + " WPM=" + String(wpm) + " NbSamples=" + String(nbSamples));
+            }
+            sNewNbSamples = newNbSamples;
+          }
         }
       }
 
@@ -821,13 +860,14 @@ Acq:
         if (wpm > 30) lacktime = 1.2;
         if (wpm > 35) lacktime = 1.5;
 
-        addTime(lowduration); // Silent duration
-
+        bool storeTime = true;
         if (lowduration > (hightimesavg * (2 * lacktime)) && lowduration < hightimesavg * (5 * lacktime)) { // letter space
+            storeTime = false;
             CodeToChar();
         }
 
         if (lowduration >= hightimesavg * (spaceDetector * lacktime)) { // word space
+          storeTime = false;
           CodeToChar();        
           AddCharacter(' ');
           if (!graph && !dataSet)
@@ -841,6 +881,9 @@ Acq:
             }
           }
         }
+
+        if (storeTime) 
+          addTime(lowduration); // Silent inside char
       }
     } // filteredstate != filteredstatebefore
 
@@ -852,7 +895,7 @@ Acq:
     // Sécurité
     if (strlen(CodeBuffer) == bufSize - 1) {
       // On a reçu des . et -, mais pas de silence...
-      clearCodeBuffer();
+      clearCodeBuffer(false);
     }
   } // !bScan
 
@@ -1020,7 +1063,7 @@ Acq:
   if (cptLoop == 1)
   {
     int loopTime = millis() - tStartLoop;
-    tftDrawString(176, 280, String(loopTime));  
+    tftDrawString(176, 280, String(loopTime), true);  
   }
 
   manageRotaryButton();
