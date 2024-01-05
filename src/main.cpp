@@ -219,29 +219,40 @@ void clearCodeBuffer(bool clone)
   // for (int i = 1; i < bufSize; i++) CodeBuffer[i] = ' ';
 };
 
-//int cptNoChange = 0;
-// void clearIfNotChanged()
-// {
-//   // Clear buffer when no changes
-//   if ( (bufLen > 0) && (bufLen == sBufLen) )
-//   {
-//     cptNoChange++;
-//     if (cptNoChange > 500)
-//     {
-//       cptNoChange = 0;
-//       clearCodeBuffer(false);
-//     }
-//     if (startNoChange == 0)
-//       startNoChange = millis();
-//     else if (millis() - startNoChange > 3000) 
-//     {
-//       // Trop long sans changement de CodeBuffer
-//       startNoChange = 0;
-//       clearCodeBuffer(false);
-//     }
-//   }
-//   sBufLen = bufLen;
-//}
+// ADC speed problem 
+// 11496 when the following code is not compiled (with ADCGives11496SampBySec defined)
+// 9000 samp/s only when the code is compiled with ADCGives9000SampBySec defined)
+#define ADCGives11496SampBySec
+//#define ADCGives9000SampBySec
+int cptNoChange = 0;
+void clearIfNotChanged()
+{
+  // Clear buffer when no changes
+#ifdef ADCGives11496SampBySec
+  // Do not compile this code
+#endif
+
+#ifdef ADCGives9000SampBySec
+  if ( (bufLen > 0) && (bufLen == sBufLen) )
+  {
+    cptNoChange++;
+    if (cptNoChange > 500)
+    {
+      cptNoChange = 0;
+      clearCodeBuffer(false);
+    }
+    if (startNoChange == 0)
+      startNoChange = millis();
+    else if (millis() - startNoChange > 3000) 
+    {
+      // Trop long sans changement de CodeBuffer
+      startNoChange = 0;
+      clearCodeBuffer(false);
+    }
+  }
+  sBufLen = bufLen;
+#endif
+}
 
 bool display = true;
 int cptCharPrinted = 0;
@@ -683,12 +694,12 @@ void setup() {
   //   et j'obtiens maintenant 11496 samp/s avec PlatformIO (alors que j'avais seulement 11246 samp/s sur ArduinoIDE)
   //   et ce toujours avec un Div:2 au boot de l'ESP32 ???
   // C'est juste incompréhensible !!!!!!!!!!!!!!!!!!!!!!!!!!!!               
-
   // Measure sampling_freq
   int tStartLoop = millis();
   int cpt = 0;
   while ( (millis() - tStartLoop) < 4000) { testData[0] = analogRead(A0); cpt++;}
-  sampling_freq = cpt / 4;  // Measured at Startup on NodeMCU-32S
+  sampling_freq = cpt / 4;  // Measured at Startup on NodeMCU-32S  
+  //Serial.println("sampling_freq=" + String(sampling_freq)); // 11496 when this line is commented !!!! and 10114 when this line is uncommented
 
   // Templates
   tft.setTextColor(TFT_SKYBLUE);
@@ -972,7 +983,7 @@ Acq:
       stop = HIGH;
     }
 
-    //clearIfNotChanged();
+    clearIfNotChanged();
 
     // Sécurité buffer overflow
     if (strlen(CodeBuffer) == bufSize - 1) {
