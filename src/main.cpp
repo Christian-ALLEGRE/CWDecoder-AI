@@ -79,9 +79,9 @@
 
 TFT_eSPI tft = TFT_eSPI();  
 
-void tftDrawString(int x, int y, String s, bool display = true)
+void tftDrawString(int x, int y, String s, bool disp = true)
 {
-  if (display)
+  if (disp)
   {
     tft.setCursor(x, y);
     tft.println(s);
@@ -185,6 +185,9 @@ void printTimes(char c)
 }
 
 #define bufSize 8
+int bufLen;
+int sBufLen;
+int startNoChange = 0;
 char CodeBuffer[bufSize]; // 6 . ou - + 1 en trop (avant sécurité) + \0
 char CodeBuffer2[bufSize]; // 6 . ou - + 1 en trop (avant sécurité) + \0
 #define nbChars 33
@@ -194,6 +197,12 @@ int iCar = 0;
 int  stop = LOW;
 int  wpm;
 int  sWpm;
+
+void clearDisplay()
+{
+  iRow = 0;
+  tft.fillRect(0, 60, 480, 220, TFT_BLACK); // Clear display area
+}
 
 void clearDisplayLine()
 {
@@ -206,9 +215,35 @@ void clearCodeBuffer(bool clone)
   if (clone)
     strcpy(CodeBuffer2, CodeBuffer);
   CodeBuffer[0] = '\0';
+  bufLen = 0;
   // for (int i = 1; i < bufSize; i++) CodeBuffer[i] = ' ';
 };
 
+//int cptNoChange = 0;
+// void clearIfNotChanged()
+// {
+//   // Clear buffer when no changes
+//   if ( (bufLen > 0) && (bufLen == sBufLen) )
+//   {
+//     cptNoChange++;
+//     if (cptNoChange > 500)
+//     {
+//       cptNoChange = 0;
+//       clearCodeBuffer(false);
+//     }
+//     if (startNoChange == 0)
+//       startNoChange = millis();
+//     else if (millis() - startNoChange > 3000) 
+//     {
+//       // Trop long sans changement de CodeBuffer
+//       startNoChange = 0;
+//       clearCodeBuffer(false);
+//     }
+//   }
+//   sBufLen = bufLen;
+//}
+
+bool display = true;
 int cptCharPrinted = 0;
 bool CRRequested = false;
 bool graph = false;   // To draw magnitude curve
@@ -230,7 +265,7 @@ void AddCharacter(char newchar)
     iCar = 0;
     int posRow = 60 + (iRow * 20);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
-    tftDrawString(0, posRow, DisplayLine); // Affiche aussi CodeBuffer (qui suit DisplayLine en mémmoire et contient le \0)
+    tftDrawString(0, posRow, DisplayLine, display); // Affiche aussi CodeBuffer (qui suit DisplayLine en mémmoire et contient le \0)
     tft.fillRect(394, posRow, 72, 20, TFT_BLACK); // Clear CodeBuffer
     clearDisplayLine();
     iRow++;
@@ -246,7 +281,6 @@ void AddCharacter(char newchar)
   DisplayLine[nbChars - 1] = newchar;
 }
 
-bool trace = false;
 char lastChar = '{';
 char curChar = '{';
 void CodeToChar() { // translate cw code to ascii character//
@@ -375,16 +409,18 @@ void setBandWidth(int nbsampl)
   tftDrawString(180, 20, String(bw, 0));
 }
 
+bool trace = false;
 int idxCde= 0;
 int idxCdeMax = 9;
 char cdes[] = { 'F',  // sampling_freq
                 'A',  // AutoTuneFreq
                 'V',  // Volume
                 'G',  // graph
-                'D',  // trace
+                'D',  // display
+                'T',  // trace
                 'I',  // Generate DataSet fo Neural Network training
                 'S',  // nbSamples
-                'T',  // nbTime filter
+                'N',  // nbTime filter
                 'R',  // magReactivity
                 'B'   // Space detector
               }; 
@@ -409,7 +445,7 @@ void showCde(int cde)
     case 'S':
       cdeText = "NbSample=" + String(nbSamples);
       break;
-    case 'T':
+    case 'N':
       cdeText = "Filtre=" + String(nbTime);
       break;
     case 'R':
@@ -425,6 +461,12 @@ void showCde(int cde)
         cdeText = "Graph OFF";
       break;
     case 'D':
+      if (display)
+        cdeText = "Display ON";
+      else
+        cdeText = "Display OFF";
+      break;
+    case 'T':
       if (trace)
         cdeText = "Trace ON";
       else
@@ -473,7 +515,7 @@ void manageRotaryButton()
             nbSamples = NBSAMPLEMAX;
           setBandWidth(nbSamples);
           break;
-        case 'T':
+        case 'N':
           nbTime++;
           if (nbTime > 10)
             nbTime = 10;
@@ -492,6 +534,11 @@ void manageRotaryButton()
           graph = !graph;
           break;
         case 'D':
+          display = !display;
+          if (!display)
+            clearDisplay();
+          break;
+        case 'T':
           trace = !trace;
           if (!trace)
           {
@@ -534,7 +581,7 @@ void manageRotaryButton()
             nbSamples = NBSAMPLEMIN;
           setBandWidth(nbSamples);
           break;
-        case 'T':
+        case 'N':
           nbTime--;
           if (nbTime < 0)
             nbTime = 0;
@@ -553,6 +600,11 @@ void manageRotaryButton()
           graph = !graph;
           break;
         case 'D':
+          display = !display;
+          if (!display)
+            clearDisplay();
+          break;
+        case 'T':
           trace = !trace;
           if (!trace)
           {
@@ -595,10 +647,6 @@ void setup() {
   Serial.begin(115200);
   delay(1200); // 1200 mini to wait Serial is initialized...
 
-  // Gestion des ADC
-  esp_err_t errCode = adc_set_clk_div(1); // Using PlatformIO, default=2 !!!!!! We need 1 (i.e no dividor) ti get over 10k Samples/s
-  Serial.println("adc_set_clk_div(): ErrCode=" + String(errCode));
-
   // TFT 4" SPI Init
   // Max SPI_FREQUENCY for this tft is 80000000 (80MHz) which is also the Max SPI speed for ESP32
   // It is only 10 MHz for SPI Potientiometer according to MCP41010 Datasheet, 
@@ -610,8 +658,6 @@ void setup() {
   tft.setTextColor(TFT_ORANGE);
   uint32_t cpu_freq = esp_clk_cpu_freq();
   tftDrawString(0, 5, "CW Decoder V2.0a (03/01/2024) by F4LAA (PlatformIO)             CpuFreq: " + String(cpu_freq / 1000000) + "MHz", true);
-  // ATTENTION: Si on enlève cette trace, le adc_set_clk_div(1) ne fonctionne pas !!!
-  // uint32_t abp_freq = esp_clk_apb_freq();  
   tft.setTextSize(2);
 
   // Rotary encoder
@@ -622,9 +668,21 @@ void setup() {
   //rotSWState = digitalRead(rotEncSW);
   /* */
 
-  // Gestion des ADC : Il faut le refaire (après Init du TFT) !!!
-  esp_err_t errCode2 = adc_set_clk_div(1); // Using PlatformIO, default=2 !!!!!! We need 1 (i.e no dividor) ti get over 10k Samples/s
-  Serial.println("adc_set_clk_div(): ErrCode2=" + String(errCode2));
+  // Gestion des ADC
+  // Problème avec PlatformIO qui utilise un div 2 pour la clock de l'ADC
+  // Au boot, on a : 
+  //   mode:DIO, clock div:2
+  // Alors que si compilé avec ArduinoIDE on a :
+  //   mode:DIO, clock div:1
+  //esp_err_t errCode = adc_set_clk_div(1); // Using PlatformIO, default=2 !!!!!! We need 1 (i.e no dividor) to get over 10k Samples/s
+  //Serial.println("adc_set_clk_div(): ErrCode=" + String(errCode));
+  // 05/01/2024 19:53 : 
+  // Après création du topic suivant sur PlatformIO
+  //   https://community.platformio.org/t/platformio-esp32-adc-use-a-div-2-clock-while-arduino-ide-use-div-1-so-adc-becomes-too-slow/37645 
+  //   J'ai mis en commentaire les 2 lignes ci-dessus, pour vérifier que samp/s tombait bien à 7500, 7600
+  //   et j'obtiens maintenant 11496 samp/s avec PlatformIO (alors que j'avais seulement 11246 samp/s sur ArduinoIDE)
+  //   et ce toujours avec un Div:2 au boot de l'ESP32 ???
+  // C'est juste incompréhensible !!!!!!!!!!!!!!!!!!!!!!!!!!!!               
 
   // Measure sampling_freq
   int tStartLoop = millis();
@@ -707,12 +765,16 @@ int dispMoy = 0;
 int sBMoy = 0;
 bool moyChanged = false;
 bool moyComputed = false;
+bool silentDuringSound = false;
 int silent = 5; // barGraph silent level
 
 void loop() {
   cptLoop++;
   if(cptLoop == 1)
+  {
     tStartLoop = millis();
+    //esp_err_t errCode = adc_set_clk_div(1); // Using PlatformIO, default=2 !!!!!! We need 1 (i.e no dividor) ti get over 10k Samples/s
+  }
 
 Acq:
   /* *
@@ -824,12 +886,32 @@ Acq:
         if (highduration < (hightimesavg * 2) && highduration > (hightimesavg * 0.6)) { /// 0.6 filter out false dits
           strcat(CodeBuffer, ".");
           addTime(highduration); // Dot duration
+          bufLen++;
           //Serial.print(".");
+
+          // if ( (highduration > 10)  // Ignore too short highduration caused by noise
+          //      && 
+          //      (highduration < 200) // Ignore too long highduration caused by silent
+          //    )
+          // {
+          //   // Compute WPM based on Dot
+          //   wpm = (wpm + (1200 / highduration )) / 2; //// the most precise we can do ;o)
+
+          //   // Now, adjust NBSAMPLES according to WPM
+          //   newNbSamples = map(wpm, 15, 33, 110, 70);  // Mesuré OK: 110samples pour 15WPM, 70samples pour 33WPM       
+          //   if (abs(newNbSamples - sNewNbSamples) > 2) 
+          //   {
+          //     nbSamples = newNbSamples;
+          //     setBandWidth(nbSamples);
+          //   }
+          //   sNewNbSamples = newNbSamples;
+          // }
         }
         
         if (highduration > (hightimesavg * 2) && highduration < (hightimesavg * 6)) {
           strcat(CodeBuffer, "-");
           addTime(highduration); // Dash duration
+          bufLen++;
           //Serial.print("-");
 
           if ( (highduration > 66) // Ignore too short highduration caused by silent
@@ -837,7 +919,7 @@ Acq:
                (highduration < 500) // Ignore too long highduration caused by silent
              )
           {
-            // Compute WPM
+            // Compute WPM based on Dash
             wpm = (wpm + (1200 / ((highduration) / 3))) / 2; //// the most precise we can do ;o)
 
             // Now, adjust NBSAMPLES according to WPM
@@ -846,8 +928,6 @@ Acq:
             {
               nbSamples = newNbSamples;
               setBandWidth(nbSamples);
-              // Serial.println();
-              // Serial.println("highduration=" + String(highduration) + " WPM=" + String(wpm) + " NbSamples=" + String(nbSamples));
             }
             sNewNbSamples = newNbSamples;
           }
@@ -891,8 +971,10 @@ Acq:
       CodeToChar();
       stop = HIGH;
     }
-    
-    // Sécurité
+
+    //clearIfNotChanged();
+
+    // Sécurité buffer overflow
     if (strlen(CodeBuffer) == bufSize - 1) {
       // On a reçu des . et -, mais pas de silence...
       clearCodeBuffer(false);
@@ -918,7 +1000,7 @@ Acq:
     int posRow = 60 + (iRow * 20);
     tft.fillRect(394, posRow, 72, 20, TFT_BLACK); // Clear CodeBuffer
     tft.setTextColor(TFT_CYAN, TFT_BLACK);
-    tftDrawString(0, posRow, DisplayLine); // Affiche aussi CodeBuffer (qui suit DisplayLine en mémmoire et contient le \0)
+    tftDrawString(0, posRow, DisplayLine, display); // Affiche aussi CodeBuffer (qui suit DisplayLine en mémmoire et contient le \0)
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
     
     // WPM
@@ -937,6 +1019,8 @@ Acq:
   if (barGraph > silent) 
   {
     // Sound detected
+    startLowSound = 0;
+    silentDuringSound = false;
     stopScan();
     bMoy = ( ( (bMoy * cptMoy) + barGraph ) / (cptMoy + 1) );
     dispMoy = bMoy;
@@ -952,7 +1036,16 @@ Acq:
   else
   {
     // Silence
-    moyComputed = false;
+    if (moyComputed)
+      silentDuringSound = true;
+    if (startLowSound == 0)
+      startLowSound = millis();
+    else if ((millis() - startLowSound) > 10000) // 10s with low sound
+    {
+      startLowSound = 0;
+      silentDuringSound = false;
+      moyComputed = false;
+    }
   }
   
   if (trace)
@@ -973,7 +1066,7 @@ Acq:
       if (moyChanged)
         tft.fillRect(387, 23, dispMoy, 10, TFT_RED); // Draw BarGraph
       if (moyComputed)
-        changeVolume(-4);
+        changeVolume(-20);
     }
     else if (bMoy > 50)
     {
@@ -984,14 +1077,13 @@ Acq:
         tft.fillRect(387, 23, dispMoy, 10, TFT_ORANGE); // Draw BarGraph
       }
       if (moyComputed)
-        changeVolume(-2);
+        changeVolume(-10);
     }
     else if (bMoy > 20)
     {
       // bMoy in [21..50]
       if (moyChanged)
       {
-        startLowSound = 0;
         tft.fillRect(387, 23, dispMoy, 10, TFT_GREEN); // Draw BarGraph
       }
     }
@@ -1004,20 +1096,15 @@ Acq:
       tft.fillRect(387, 23, barGraph, 10, TFT_LIGHTGREY); // Draw BarGraph
 
     // Something heard, but low : Increase volume
-    if (moyComputed)
+    if (!silentDuringSound)
     {
-      if (startLowSound == 0)
-        startLowSound = millis();
-      else if ((millis() - startLowSound) > 2000) // 2s with low sound
-      {
-        // Increase volume
-        if (barGraph > 20)
-          // barGraph in [21..30]
-          changeVolume(2);
-        else
-          // barGraph in [10..20]
-          changeVolume(4);
-      }
+      // Increase volume
+      if (barGraph > 20)
+        // barGraph in [21..30]
+        changeVolume(2);
+      else
+        // barGraph in [10..20]
+        changeVolume(4);
     }
 
     if (barGraph < 10)
@@ -1063,7 +1150,7 @@ Acq:
   if (cptLoop == 1)
   {
     int loopTime = millis() - tStartLoop;
-    tftDrawString(176, 280, String(loopTime), true);  
+    tftDrawString(176, 280, String(loopTime) + " ", true);  
   }
 
   manageRotaryButton();
