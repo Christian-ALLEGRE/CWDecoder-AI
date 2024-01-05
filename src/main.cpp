@@ -222,6 +222,14 @@ void clearCodeBuffer(bool clone)
 // ADC speed problem 
 // 11496 when the following code is not compiled (with ADCGives11496SampBySec defined)
 // 9000 samp/s only when the code is compiled with ADCGives9000SampBySec defined)
+// Response from platformIO team (05/01/2023 21:35)
+// 9000 becomes 10086 when i add 
+//   board_build.f_flash = 80000000L
+// in platformio.ini file .... 
+// with this change in platformIO.ini, div:1 is show at boot time :)
+//
+// But the ADC speed still decrease a lot (10086 instead of 11496)
+
 #define ADCGives11496SampBySec
 //#define ADCGives9000SampBySec
 int cptNoChange = 0;
@@ -229,7 +237,7 @@ void clearIfNotChanged()
 {
   // Clear buffer when no changes
 #ifdef ADCGives11496SampBySec
-  // Do not compile this code
+  // Do not compile the code inside this function
 #endif
 
 #ifdef ADCGives9000SampBySec
