@@ -693,15 +693,20 @@ void setup() {
   //   mode:DIO, clock div:2
   // Alors que si compilé avec ArduinoIDE on a :
   //   mode:DIO, clock div:1
+
+  // ADC speed problem
   //esp_err_t errCode = adc_set_clk_div(1); // Using PlatformIO, default=2 !!!!!! We need 1 (i.e no dividor) to get over 10k Samples/s
   //Serial.println("adc_set_clk_div(): ErrCode=" + String(errCode));
   // 05/01/2024 19:53 : 
-  // Après création du topic suivant sur PlatformIO
-  //   https://community.platformio.org/t/platformio-esp32-adc-use-a-div-2-clock-while-arduino-ide-use-div-1-so-adc-becomes-too-slow/37645 
-  //   J'ai mis en commentaire les 2 lignes ci-dessus, pour vérifier que samp/s tombait bien à 7500, 7600
-  //   et j'obtiens maintenant 11496 samp/s avec PlatformIO (alors que j'avais seulement 11246 samp/s sur ArduinoIDE)
-  //   et ce toujours avec un Div:2 au boot de l'ESP32 ???
-  // C'est juste incompréhensible !!!!!!!!!!!!!!!!!!!!!!!!!!!!               
+  // After creating the following topic on PlatformIO
+  //     https://community.platformio.org/t/platformio-esp32-adc-use-a-div-2-clock-while-arduino-ide-use-div-1-so-adc-becomes-too-slow/ 37645
+  //     I commented the 2 lines above, to verify that samp/s fall to 7500, 7600 as i said in my topic
+  //     and I now get 11496 samp/s with PlatformIO (while I only had 11246 samp/s on ArduinoIDE)
+  //     and this always with a Div:2 when starting the ESP32 ???
+  //   This is just incomprehensible!!!!!!!!!!!!!!!!!!!!!!!!!!!  
+  // Now, i leave those 2 lines commented, 
+  // and i try to see what happen to ADC speed when compiling ot not the function clearIfNotChanged()
+
   // Measure sampling_freq
   int tStartLoop = millis();
   int cpt = 0;
